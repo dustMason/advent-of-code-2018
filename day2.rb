@@ -22,8 +22,12 @@ codepoints = input.map(&:codepoints)
 
 codepoints.each do |needle|
   codepoints.each do |haystack|
-    if needle.map.with_index { |n, i| haystack[i] != n }.select(&:itself).size == 1
-      puts needle.each_with_object('').with_index { |(n, out), i| out << n if haystack[i] == n }
+    index = nil
+    diffs = needle.each.with_index.reduce(0) { |acc, (n, i)| haystack[i] != n ? (index = i) && acc + 1 : acc }
+
+    if diffs == 1
+      needle.slice!(index)
+      puts needle.pack('U*')
       exit
     end
   end
