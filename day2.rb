@@ -22,8 +22,7 @@ codepoints = input.map(&:codepoints)
 
 codepoints.each do |needle|
   codepoints.each do |haystack|
-    results = needle.map.with_index { |n, i| haystack[i] ^ n }
-    if results.select(&:nonzero?).size == 1
+    if needle.map.with_index { |n, i| haystack[i] != n }.select(&:itself).size == 1
       puts needle.each_with_object('').with_index { |(n, out), i| out << n if haystack[i] == n }
       exit
     end
