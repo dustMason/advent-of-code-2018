@@ -3,8 +3,8 @@
 regex = /@ (?<x>\d+),(?<y>\d+): (?<w>\d+)x(?<h>\d+)/
 
 def rect(x, y, w, h)
-  # (left to right).product(top to bottom)
-  ((x + 1)...(x + 1 + w)).to_a.product(((y + 1)...(y + 1 + h)).to_a)
+  # all points of the rectangle: (left to right).product((top to bottom))
+  (x...(x + w)).to_a.product((y...(y + h)).to_a)
 end
 
 input = DATA.read
