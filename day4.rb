@@ -33,7 +33,7 @@ end
 
 min = sleepiest_minute(sleepiest_guard, guards)[0]
 
-puts sleepiest_guard.to_j * min
+puts sleepiest_guard.to_i * min
 
 # part 2
 
