@@ -22,15 +22,13 @@ flat = input.dup
 def part2(flat, value = 0)
   return value if flat.empty?
   children, metas = flat.shift(2)
-  if children == 0
-    meta_val = flat.shift(metas).reduce(&:+)
-    value += meta_val
-    value
+  if children.zero?
+    value + flat.shift(metas).reduce(&:+)
   else
-    nodes = ([0] * children).map { part2(flat, value) }
-    meta_items = flat.shift(metas)
-    values = nodes.values_at(*meta_items.map { |n| n - 1 }).compact
-    values.reduce(0, &:+)
+    [*0...children].map { part2(flat, value) }
+                   .values_at(*flat.shift(metas).map(&:pred))
+                   .compact
+                   .reduce(0, &:+)
   end
 end
 
