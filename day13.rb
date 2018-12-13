@@ -1,52 +1,49 @@
+UP = [0, -1]
+RIGHT = [1, 0]
+DOWN = [0, 1]
+LEFT = [-1, 0]
+
+TOP_RIGHT = 0
+BOTTOM_RIGHT = 1
+BOTTOM_LEFT = 2
+TOP_LEFT = 3
+
 Cart = Struct.new(:dir, :x, :y, :turns) do
-  def up
-    raise if dir[1] != 0
-    self.y -= 1
-    self.dir = [0, -1]
-  end
-
-  def down
-    raise if dir[1] != 0
-    self.y += 1
-    self.dir = [0, 1]
-  end
-
-  def right
-    raise if dir[0] != 0
-    self.x += 1
-    self.dir = [1, 0]
-  end
-
-  def left
-    raise if dir[0] != 0
-    self.x -= 1
-    self.dir = [-1, 0]
-  end
-
-  def straight
+  def move(new_dir = nil)
+    self.dir = new_dir if new_dir
     self.x += dir[0]
     self.y += dir[1]
   end
 
-  def turn!
+  def corner(loc)
+    case loc
+    when TOP_RIGHT then move(dir == UP ? LEFT : DOWN)
+    when BOTTOM_RIGHT then move(dir == DOWN ? LEFT : UP)
+    when BOTTOM_LEFT then move(dir == LEFT ? UP : RIGHT)
+    when TOP_LEFT then move(dir == UP ? RIGHT : DOWN)
+    else raise
+    end
+  end
+
+  def turn
     turn = [:left, :straight, :right][turns % 3]
     case turn
     when :straight
-      straight
+      move
     when :left
       case dir
-      when [0, -1] then left
-      when [0, 1] then right
-      when [-1, 0] then down
-      when [1, 0] then up
+      when UP then move(LEFT)
+      when DOWN then move(RIGHT)
+      when LEFT then move(DOWN)
+      when RIGHT then move(UP)
       else raise
       end
     when :right
       case dir
-      when [0, -1] then right
-      when [0, 1] then left
-      when [-1, 0] then up
-      when [1, 0] then down
+      when UP then move(RIGHT)
+      when DOWN then move(LEFT)
+      when LEFT then move(UP)
+      when RIGHT then move(DOWN)
       else raise
       end
     else raise
@@ -61,14 +58,14 @@ junctions = {}
 corners = {}
 carts = []
 
-def print(board, carts, corners)
+def print(board, carts)
   lines = board.tr('<>', '-').tr('v^', '|').lines
   carts.each do |cart|
     symbol = case cart.dir
-             when [1, 0] then '>'
-             when [-1, 0] then '<'
-             when [0, 1] then 'v'
-             when [0, -1] then '^'
+             when RIGHT then '>'
+             when LEFT then '<'
+             when DOWN then 'v'
+             when UP then '^'
              end
     lines[cart.y][cart.x] = symbol
   end
@@ -81,27 +78,27 @@ input.each_line.with_index do |line, j|
     case char
     when '/'
       if line[i+1] && (%w[- + < >].include?(line[i+1]))
-        corners[[i, j]] = :top_left
+        corners[[i, j]] = TOP_LEFT
       else
-        corners[[i, j]] = :bottom_right
+        corners[[i, j]] = BOTTOM_RIGHT
       end
     when '\\'
       if line[i+1] && (%w[- + < >].include?(line[i+1]))
-        corners[[i, j]] = :bottom_left
+        corners[[i, j]] = BOTTOM_LEFT
       else
-        corners[[i, j]] = :top_right
+        corners[[i, j]] = TOP_RIGHT
       end
     when '-', '>', '<'
       if char == '>'
-        carts << Cart.new([1, 0], i, j, 0)
+        carts << Cart.new(RIGHT, i, j, 0)
       elsif char == '<'
-        carts << Cart.new([-1, 0], i, j, 0)
+        carts << Cart.new(LEFT, i, j, 0)
       end
     when '|', '^', 'v'
       if char == '^'
-        carts << Cart.new([0, -1], i, j, 0)
+        carts << Cart.new(UP, i, j, 0)
       elsif char == 'v'
-        carts << Cart.new([0, 1], i, j, 0)
+        carts << Cart.new(DOWN, i, j, 0)
       end
     when '+'
       junctions[[i, j]] = true
@@ -115,23 +112,11 @@ loop do
   carts.sort_by! { |c| [c.y, c.x] }
   carts.each do |cart|
     if junctions[[cart.x, cart.y]]
-      cart.turn!
+      cart.turn
+    elsif (corner = corners[[cart.x, cart.y]])
+      cart.corner(corner)
     else
-      if (corner = corners[[cart.x, cart.y]])
-        case corner
-        when :top_right
-          if cart.dir[1] == -1 then cart.left else cart.down end
-        when :bottom_right
-          if cart.dir[1] == 1 then cart.left else cart.up end
-        when :bottom_left
-          if cart.dir[0] == -1 then cart.up else cart.right end
-        when :top_left
-          if cart.dir[1] == -1 then cart.right else cart.down end
-        else raise
-        end
-      else
-        cart.straight
-      end
+      cart.move
     end
 
     if carts.size == 1
@@ -142,11 +127,10 @@ loop do
     if other = (carts - [cart]).find { |other_cart| other_cart.x == cart.x && other_cart.y == cart.y }
       puts "collision at #{cart}, removing #{cart} and #{other}"
       carts -= [cart, other]
-      # exit
     end
 
   end
-  # print(input, carts, corners)
+  # print(input, carts)
 end
 
 __END__
