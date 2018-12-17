@@ -62,14 +62,13 @@ def print_board(water, clay, min_x, max_x, max_y)
       if clay[p]
         board[y][x] = '#'
       elsif water[p]
-        board[y][x] = '~'
+        board[y][x] = '|'
       else
         board[y][x] = '.'
       end
     end
   end
-  puts "\n"
-  puts board.map(&:join)
+  board.map(&:join)
 end
 
 until tails.empty?
@@ -119,9 +118,14 @@ until tails.empty?
   end
 end
 
-print_board(water, clay, min_x, max_x, max_y) if DEBUG
-
+puts print_board(water, clay, min_x, max_x, max_y) if DEBUG
 puts water.keys.size - min_y + 1
+
+# part 2
+
+finished = print_board(water, clay, min_x, max_x, max_y).join
+2.times { finished.gsub!(/#(\|+)#/) { '#' + ('~' * $1.size) + '#' } }
+puts finished.count('~')
 
 __END__
 y=662, x=546..550
