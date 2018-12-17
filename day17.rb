@@ -1,5 +1,9 @@
 require 'set'
 
+input = DATA.read
+DEBUG = false
+TOP = 250
+
 P = Struct.new(:x, :y) do
   def left; P.new(x - 1, y); end
   def right; P.new(x + 1, y); end
@@ -7,10 +11,6 @@ P = Struct.new(:x, :y) do
   def up; P.new(x, y - 1); end
   def dup; P.new(x, y); end
 end
-
-input = DATA.read
-DEBUG = false
-TOP = 250
 
 max_y = 0
 max_x = 0
@@ -23,49 +23,35 @@ clay = {}
 water = { spring.down => true }
 
 input.each_line do |line|
-  break if line.start_with? '---'
   single, range = line.split(', ')
-  if single.start_with?('y')
-    y = single[2..-1].to_i
-    min_y = y if y < min_y
-    max_y = y if y > max_y
-    x_start, x_end = range[2..-1].split('..').map(&:to_i)
-    (x_start..x_end).each do |x|
-      min_x = x if x < min_x
-      max_x = x if x > max_x
-      clay[P.new(x, y)] = true
-    end
-  else
-    x = single[2..-1].to_i
-    min_x = x if x < min_x
-    max_x = x if x > max_x
-    y_start, y_end = range[2..-1].split('..').map(&:to_i)
-    (y_start..y_end).each do |y|
-      min_y = y if y < min_y
-      max_y = y if y > max_y
-      clay[P.new(x, y)] = true
-    end
+  vertical = single.start_with?('x')
+  single = single[2..-1].to_i
+
+  r_start, r_end = range[2..-1].split('..').map(&:to_i)
+  (r_start..r_end).each do |i|
+    pair = vertical ? [single, i] : [i, single]
+    clay[P.new(*pair)] = true
   end
 end
 
-# max_y = TOP
-min_x -= 3
-max_x += 3
+clay.keys.each do |p|
+  min_y = p.y if p.y < min_y
+  max_y = p.y if p.y > max_y
+  min_x = p.x if p.x < min_x
+  max_x = p.x if p.x > max_x
+end
 
-def print_board(water, clay, min_x, max_x, max_y)
+# max_y = TOP
+min_x -= 3 if DEBUG
+max_x += 3 if DEBUG
+
+def board(water, clay, min_x, max_x, max_y)
   board = []
-  (0..max_y + 2).each do |y|
+  (0..max_y).each do |y|
     (min_x..max_x).each do |x|
       p = P.new(x, y)
-      x -= min_x
       board[y] ||= []
-      if clay[p]
-        board[y][x] = '#'
-      elsif water[p]
-        board[y][x] = '|'
-      else
-        board[y][x] = '.'
-      end
+      board[y][x - min_x] = if clay[p] then '#' elsif water[p] then '|' else '.' end
     end
   end
   board.map(&:join)
@@ -78,36 +64,27 @@ until tails.empty?
 
   if clay[tail.down]
     left = right = row_seed = tail.dup
-    left_contained = right_contained = true
+    contained = true
 
     loop do
-      loop do
-        if !clay[left.down] && !water[left.down]
-          tails << left if !tails.include?(left) && !falls.include?(left.right)
-          falls << left
-          left_contained = false
-          break
-        end
+      [[left, -1], [right, 1]].each do |pointer, dir|
+        loop do
+          if !clay[pointer.down] && !water[pointer.down]
+            prev = P.new(pointer.x - dir, pointer.y)
+            tails << pointer if !tails.include?(pointer) && !falls.include?(prev)
+            falls << pointer
+            contained = false
+            break
+          end
 
-        water[left] = true
-        break if clay[left.left]
-        left = left.left
+          water[pointer] = true
+          step = P.new(pointer.x + dir, pointer.y)
+          break if clay[step]
+          pointer = step
+        end
       end
 
-      loop do
-        if !clay[right.down] && !water[right.down]
-          tails << right if !tails.include?(right) && !falls.include?(right.left)
-          falls << right
-          right_contained = false
-          break
-        end
-
-        water[right] = true
-        break if clay[right.right]
-        right = right.right
-      end
-
-      break if !left_contained || !right_contained
+      break unless contained
 
       row_seed = row_seed.up
       left = right = row_seed.dup
@@ -118,12 +95,12 @@ until tails.empty?
   end
 end
 
-puts print_board(water, clay, min_x, max_x, max_y) if DEBUG
+puts board(water, clay, min_x, max_x, max_y) if DEBUG
 puts water.keys.size - min_y + 1
 
 # part 2
 
-finished = print_board(water, clay, min_x, max_x, max_y).join
+finished = board(water, clay, min_x, max_x, max_y).join
 2.times { finished.gsub!(/#(\|+)#/) { '#' + ('~' * $1.size) + '#' } }
 puts finished.count('~')
 
