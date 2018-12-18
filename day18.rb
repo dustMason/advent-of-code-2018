@@ -1,19 +1,16 @@
 require 'set'
 
+OPEN = '.'
+TREE = '|'
+LMBR = '#'
+
 input = DATA.read
 
-open = Set.new
-trees = Set.new
-lumber = Set.new
+land = {}
 
 input.each_line.with_index do |line, y|
-  break if line.start_with? 'break'
   line.strip.each_char.with_index do |char, x|
-    case char
-    when '.' then open << [x, y]
-    when '|' then trees << [x, y]
-    when '#' then lumber << [x, y]
-    end
+    land[[x, y]] = char
   end
 end
 
@@ -30,21 +27,12 @@ def adjacent(x, y)
   ]
 end
 
-def pr(open, trees, lumber)
+def pr(land)
   out = []
-  open.each do |(x, y)|
+  land.each do |(x, y), char|
     out[y] ||= []
-    out[y][x] = '.'
+    out[y][x] = char
   end
-  trees.each do |(x, y)|
-    out[y] ||= []
-    out[y][x] = '|'
-  end
-  lumber.each do |(x, y)|
-    out[y] ||= []
-    out[y][x] = '#'
-  end
-
   out.map(&:join)
 end
 
@@ -54,39 +42,24 @@ frame_set = Set.new
 frames = []
 
 min, sequence = 1.step(to: part_2) do |min|
-  new_open, new_trees, new_lumber = [open.dup, trees.dup, lumber.dup]
+  new_land = land.dup
 
-  open.each do |(x, y)|
-    around = adjacent(x, y)
-    if around.count { |(ax, ay)| trees === [ax, ay] } >= 3
-      new_trees << [x, y]
-      new_open.delete([x, y])
+  land.each do |coord, char|
+    kinds = adjacent(*coord).group_by { |c| land[c] }.transform_values!(&:size)
+
+    case char
+    when OPEN
+      new_land[coord] = TREE if kinds[TREE]&.>= 3
+    when TREE
+      new_land[coord] = LMBR if kinds[LMBR] &.>= 3
+    when LMBR
+      new_land[coord] = OPEN if !kinds[TREE] || !kinds[LMBR]
     end
   end
 
-  trees.each do |(x, y)|
-    around = adjacent(x, y)
-    if around.count { |(ax, ay)| lumber === [ax, ay] } >= 3
-      new_lumber << [x, y]
-      new_trees.delete([x, y])
-    end
-  end
+  land = new_land
 
-  lumber.each do |(x, y)|
-    around = adjacent(x, y)
-    t = around.none? { |c| trees === c }
-    l = around.none? { |c| lumber === c }
-    if t || l
-      new_open << [x, y]
-      new_lumber.delete([x, y])
-    end
-  end
-
-  open = new_open
-  trees = new_trees
-  lumber = new_lumber
-
-  frame = pr(open, trees, lumber)
+  frame = pr(land)
   if frame_set.member? frame
     before = frames.find_index(frame) + 1
     break [min, frames[(before - 1)...min]]
@@ -99,12 +72,11 @@ end
 
 remaining = part_2 - min
 final_frame = remaining % sequence.size
+
 joined = sequence[final_frame].join
-tree_count = joined.count('|')
-lumber_count = joined.count('#')
 
 puts
-puts tree_count * lumber_count
+puts joined.count(TREE) * joined.count(LMBR)
 
 __END__
 #.|#||..#......##.#||..||....|.#.|.#...#.|..|||.|.
