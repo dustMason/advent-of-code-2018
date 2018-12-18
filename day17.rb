@@ -5,11 +5,11 @@ DEBUG = false
 TOP = 250
 
 P = Struct.new(:x, :y) do
-  def left; P.new(x - 1, y); end
+  def left;  P.new(x - 1, y); end
   def right; P.new(x + 1, y); end
-  def down; P.new(x, y + 1); end
-  def up; P.new(x, y - 1); end
-  def dup; P.new(x, y); end
+  def down;  P.new(x, y + 1); end
+  def up;    P.new(x, y - 1); end
+  def dup;   P.new(x, y); end
 end
 
 max_y = 0
@@ -19,8 +19,8 @@ min_y = Float::INFINITY
 spring = P.new(500, 0)
 tails = [spring.down]
 falls = tails.to_set
-clay = {}
-water = { spring.down => true }
+clay = Set.new
+water = Set.new([spring.down])
 
 input.each_line do |line|
   single, range = line.split(', ')
@@ -30,15 +30,13 @@ input.each_line do |line|
   r_start, r_end = range[2..-1].split('..').map(&:to_i)
   (r_start..r_end).each do |i|
     pair = vertical ? [single, i] : [i, single]
-    clay[P.new(*pair)] = true
+    p = P.new(*pair)
+    min_y = p.y if p.y < min_y
+    max_y = p.y if p.y > max_y
+    min_x = p.x if p.x < min_x
+    max_x = p.x if p.x > max_x
+    clay << p
   end
-end
-
-clay.keys.each do |p|
-  min_y = p.y if p.y < min_y
-  max_y = p.y if p.y > max_y
-  min_x = p.x if p.x < min_x
-  max_x = p.x if p.x > max_x
 end
 
 # max_y = TOP
@@ -51,7 +49,7 @@ def board(water, clay, min_x, max_x, max_y)
     (min_x..max_x).each do |x|
       p = P.new(x, y)
       board[y] ||= []
-      board[y][x - min_x] = if clay[p] then '#' elsif water[p] then '|' else '.' end
+      board[y][x - min_x] = if clay === p then '#' elsif water === p then '|' else '.' end
     end
   end
   board.map(&:join)
@@ -60,16 +58,16 @@ end
 until tails.empty?
   tail = tails.pop
   next if tail.y >= max_y
-  water[tail] = true
+  water << tail
 
-  if clay[tail.down]
+  if clay === tail.down
     left = right = row_seed = tail.dup
     contained = true
 
     loop do
       [[left, -1], [right, 1]].each do |pointer, dir|
         loop do
-          if !clay[pointer.down] && !water[pointer.down]
+          if !clay.member?(pointer.down) && !water.member?(pointer.down)
             prev = P.new(pointer.x - dir, pointer.y)
             tails << pointer if !tails.include?(pointer) && !falls.include?(prev)
             falls << pointer
@@ -77,9 +75,9 @@ until tails.empty?
             break
           end
 
-          water[pointer] = true
+          water << pointer
           step = P.new(pointer.x + dir, pointer.y)
-          break if clay[step]
+          break if clay === step
           pointer = step
         end
       end
@@ -90,13 +88,13 @@ until tails.empty?
       left = right = row_seed.dup
     end
   else
-    water[tail.down] = true
+    water << tail.down
     tails << tail.down
   end
 end
 
 puts board(water, clay, min_x, max_x, max_y) if DEBUG
-puts water.keys.size - min_y + 1
+puts water.size - min_y + 1
 
 # part 2
 
