@@ -69,7 +69,7 @@ until tails.empty?
         loop do
           if !clay.member?(pointer.down) && !water.member?(pointer.down)
             prev = P.new(pointer.x - dir, pointer.y)
-            tails << pointer if !tails.include?(pointer) && !falls.include?(prev)
+            tails << pointer unless falls.include?(prev)
             falls << pointer
             contained = false
             break

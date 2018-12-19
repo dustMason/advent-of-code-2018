@@ -1,107 +1,34 @@
 require 'set'
+require_relative './elfputer'
 
 input = DATA.read
-
-class Device
-  class << self
-    attr_reader :reg
-
-    def reset(*regs)
-      @reg = regs
-    end
-
-    def addr(rega, regb, regc)
-      @reg[regc] = @reg[rega] + @reg[regb]
-    end
-
-    def addi(rega, valb, regc)
-      @reg[regc] = @reg[rega] + valb
-    end
-
-    def mulr(rega, regb, regc)
-      @reg[regc] = @reg[rega] * @reg[regb]
-    end
-
-    def muli(rega, valb, regc)
-      @reg[regc] = @reg[rega] * valb
-    end
-
-    def banr(rega, regb, regc)
-      @reg[regc] = @reg[rega] & @reg[regb]
-    end
-
-    def bani(rega, valb, regc)
-      @reg[regc] = @reg[rega] & valb
-    end
-
-    def borr(rega, regb, regc)
-      @reg[regc] = @reg[rega] | @reg[regb]
-    end
-
-    def bori(rega, valb, regc)
-      @reg[regc] = @reg[rega] | valb
-    end
-
-    def setr(rega, _, regc)
-      @reg[regc] = @reg[rega].dup
-    end
-
-    def seti(vala, _, regc)
-      @reg[regc] = vala
-    end
-
-    def gtir(vala, regb, regc)
-      @reg[regc] = vala > @reg[regb] ? 1 : 0
-    end
-
-    def gtri(rega, valb, regc)
-      @reg[regc] = @reg[rega] > valb ? 1 : 0
-    end
-
-    def gtrr(rega, regb, regc)
-      @reg[regc] = @reg[rega] > @reg[regb] ? 1 : 0
-    end
-
-    def eqir(vala, regb, regc)
-      @reg[regc] = vala == @reg[regb] ? 1 : 0
-    end
-
-    def eqri(rega, valb, regc)
-      @reg[regc] = @reg[rega] == valb ? 1 : 0
-    end
-
-    def eqrr(rega, regb, regc)
-      @reg[regc] = @reg[rega] == @reg[regb] ? 1 : 0
-    end
-  end
-end
-
-Device.reset(0, 0, 0, 0, 0, 0)
+device = Device.new
+device.reset(0, 0, 0, 0, 0, 0)
 
 program = input.each_line.map do |line|
   op, *args = line.split(' ')
-  op.gsub!('#', '')
+  op.delete!('#')
   [op, *args.map(&:to_i)]
 end
 
 ip_location = program.shift.last
-line_number = Device.reg[ip_location]
+line_number = device.reg[ip_location]
+program_range = (0...program.size)
 
 # part 1
 
-while (0...program.size).cover?(line_number)
-  line = program[line_number]
-  Device.reg[ip_location] = line_number
-  Device.send(*line)
-  line_number = Device.reg[ip_location] + 1
+while program_range.cover?(line_number)
+  device.reg[ip_location] = line_number
+  device.send(*program[line_number])
+  line_number = device.reg[ip_location] + 1
 end
 
-puts Device.reg.to_s
+puts device.reg.to_s
 
 # part 2
 
 # watch output until register 3 settles, then get the sum of its divisors.
-# thats the answer.
+# that's the answer.
 
 __END__
 #ip 2

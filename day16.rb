@@ -1,84 +1,10 @@
 require 'set'
+require_relative './elfputer'
 
 input = DATA.read
+device = Device.new
 
-class Device
-  class << self
-    attr_reader :reg
-
-    @reg = []
-
-    def reset(a, b, c, d)
-      @reg = [a, b, c, d]
-    end
-
-    def addr(rega, regb, regc)
-      @reg[regc] = @reg[rega] + @reg[regb]
-    end
-
-    def addi(rega, valb, regc)
-      @reg[regc] = @reg[rega] + valb
-    end
-
-    def mulr(rega, regb, regc)
-      @reg[regc] = @reg[rega] * @reg[regb]
-    end
-
-    def muli(rega, valb, regc)
-      @reg[regc] = @reg[rega] * valb
-    end
-
-    def banr(rega, regb, regc)
-      @reg[regc] = @reg[rega] & @reg[regb]
-    end
-
-    def bani(rega, valb, regc)
-      @reg[regc] = @reg[rega] & valb
-    end
-
-    def borr(rega, regb, regc)
-      @reg[regc] = @reg[rega] | @reg[regb]
-    end
-
-    def bori(rega, valb, regc)
-      @reg[regc] = @reg[rega] | valb
-    end
-
-    def setr(rega, _, regc)
-      @reg[regc] = @reg[rega].dup
-    end
-
-    def seti(vala, _, regc)
-      @reg[regc] = vala
-    end
-
-    def gtir(vala, regb, regc)
-      @reg[regc] = vala > @reg[regb] ? 1 : 0
-    end
-
-    def gtri(rega, valb, regc)
-      @reg[regc] = @reg[rega] > valb ? 1 : 0
-    end
-
-    def gtrr(rega, regb, regc)
-      @reg[regc] = @reg[rega] > @reg[regb] ? 1 : 0
-    end
-
-    def eqir(vala, regb, regc)
-      @reg[regc] = vala == @reg[regb] ? 1 : 0
-    end
-
-    def eqri(rega, valb, regc)
-      @reg[regc] = @reg[rega] == valb ? 1 : 0
-    end
-
-    def eqrr(rega, regb, regc)
-      @reg[regc] = @reg[rega] == @reg[regb] ? 1 : 0
-    end
-  end
-end
-
-all_ops = Device.methods(false) - [:reg, :reset]
+all_ops = Device.instance_methods(false) - [:reg, :reset]
 
 part1, part2 = input.split("\n\n\n\n")
 
@@ -94,9 +20,9 @@ part1.split("\n\n").each do |example|
   args = operation[1..-1]
   possibles = 0
   all_ops.each do |op|
-    Device.reset(*before)
-    Device.send(op, *args)
-    expected = Device.reg
+    device.reset(*before)
+    device.send(op, *args)
+    expected = device.reg
     if expected == after
       possibles += 1
       break if possibles == 3
@@ -119,9 +45,9 @@ part1.split("\n\n").each.with_index do |example, i|
   args = operation[1..-1]
   possibles = []
   all_ops.each do |op|
-    Device.reset(*before)
-    Device.send(op, *args)
-    expected = Device.reg
+    device.reset(*before)
+    device.send(op, *args)
+    expected = device.reg
     possibles << op if expected == after
   end
 
@@ -142,15 +68,15 @@ until map.all? { |(_num, choices)| choices.size == 1 }
   end
 end
 
-Device.reset(0, 0, 0, 0)
+device.reset(0, 0, 0, 0)
 
 part2.each_line do |line|
   instruction = line.split(' ').map(&:to_i)
   op = identified[instruction[0]]
-  Device.send(op, *instruction[1..-1])
+  device.send(op, *instruction[1..-1])
 end
 
-puts Device.reg.to_s
+puts device.reg.to_s
 
 __END__
 Before: [1, 1, 1, 0]
