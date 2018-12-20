@@ -4,44 +4,48 @@ input = DATA.read
 
 DIRS = %w[N E S W].to_set
 
-def parse(regex, pos = [0, 0], walks = {}, stack = [])
+def parse(regex)
+  graph = {}
+  stack = []
+  pos = [0, 0]
+
   char = regex.pop
-  return walks if char == '$'
-  x, y = pos
-  if DIRS.include?(char)
-    walks[pos] ||= Set.new
-    loc = case char
-          when 'E' then [x + 1, y]
-          when 'W' then [x - 1, y]
-          when 'N' then [x, y - 1]
-          when 'S' then [x, y + 1]
-          end
-    walks[pos] << loc
-    walks[loc] ||= Set.new
-    walks[loc] << pos
-    pos = loc
-  elsif char == '('
-    stack << pos
-  elsif char == ')'
-    stack.pop
-  elsif char == '|'
-    pos = stack.last
+  while char
+    x, y = pos
+    if DIRS.include?(char)
+      graph[pos] ||= Set.new
+      loc = case char
+            when 'E' then [x + 1, y]
+            when 'W' then [x - 1, y]
+            when 'N' then [x, y - 1]
+            when 'S' then [x, y + 1]
+            end
+      graph[pos] << loc
+      graph[loc] ||= Set.new
+      graph[loc] << pos
+      pos = loc
+    elsif char == '('
+      stack << pos
+    elsif char == ')'
+      stack.pop
+    elsif char == '|'
+      pos = stack.last
+    end
+    char = regex.pop
   end
-  parse(regex, pos, walks, stack)
+
+  graph
 end
 
 def search(map, pos, seen = Set.new, path = [])
-  path << pos if path.empty?
   seen << pos
-
   paths = []
   map[pos].each do |step|
     next if seen.include?(step)
     t_path = path + [step]
     paths << t_path
-    paths += search(map, step, seen.dup, t_path)
+    paths += search(map, step, seen, t_path)
   end
-
   paths
 end
 
@@ -50,10 +54,10 @@ input.each_line do |line|
   all_paths = search(map, [0, 0])
 
   # part 1
-  puts all_paths.max_by(&:size).size - 1
+  puts all_paths.max_by(&:size).size
 
   # part 2
-  puts all_paths.count { |p| p.size > 1000 }
+  puts all_paths.count { |p| p.size > 999 }
 end
 
 __END__
