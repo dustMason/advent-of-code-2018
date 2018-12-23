@@ -1,13 +1,15 @@
-# depth = 3879
-# target = [8, 713]
+depth = 3879
+target = [8, 713]
 
 require 'set'
+require 'rubygems'
+require 'pqueue'
 
-depth = 510
-target = [10, 10]
+# depth = 510
+# target = [10, 10]
 
-max_x = target[0] + 4
-max_y = target[1] + 4
+max_x = target[0] + 10
+max_y = target[1] + 10
 
 indexes = {}
 types = {}
@@ -53,8 +55,6 @@ puts total_risk
 
 # part 2
 
-Node = Struct.new(:x, :y, :i, :g, :h, :f, :tool)
-
 ROCKY = 0
 WET = 1
 NARROW = 2
@@ -63,30 +63,90 @@ CLIMB = :climb
 TORCH = :torch
 NEITHER = :neither
 
-class PriorityQueue
-  def initialize
-    @queue = {}
-  end
-
-  def any?
-    @queue.any?
-  end
-
-  def insert(key, value)
-    @queue[key] = value
-    order_queue
-  end
-
-  def remove_min
-    @queue.shift.first
-  end
-
-  private
-
-  def order_queue
-    @queue.sort_by { |_key, value| value }
+Edge = Struct.new(:from, :to, :weight) do
+  def <=>(other)
+    self.weight <=> other.weight
   end
 end
+
+Node = Struct.new(:x, :y, :type, :tool)
+
+class Graph
+  attr_accessor :nodes, :edges, :types
+
+  def initialize(types)
+    @nodes = {}
+    @edges = {}
+    @types = types.dup
+  end
+
+  def build!
+    @types.each do |(x, y), type|
+      # make nodes for each possible tool
+      tools = case type
+              when ROCKY then [CLIMB, TORCH]
+              when WET then [CLIMB, NEITHER]
+              when NARROW then [TORCH, NEITHER]
+              end
+      tools.each do |tool|
+        @nodes[[x, y]] ||= Set.new
+        @nodes[[x, y]] << Node.new(x, y, type, tool)
+      end
+    end
+
+    @nodes.each do |(x, y), set|
+      expand(x, y).each do |(nx, ny)|
+        set.each do |node|
+          next unless passable?(nx, ny)
+          @nodes[[nx, ny]]&.each do |dest|
+            weight = minutes(node.tool, dest.tool)
+            add_edge(node, dest, weight)
+          end
+        end
+      end
+    end
+
+    @nodes = @nodes.flat_map do |(x, y), set|
+      set.to_a.map do |node|
+        [[x, y, node.tool], node]
+      end
+    end.to_h
+  end
+
+  def add_edge(from, to, weight)
+    # puts "adding edge from #{from} to #{to} with weight #{weight}"
+    edges[from] ||= Set.new
+    edges[from] << Edge.new(from, to, weight)
+  end
+
+  def minutes(from_tool, to_tool)
+    return 1 if from_tool == to_tool
+    8
+  end
+
+  def passable?(x, y)
+    return false if x < 0 || y < 0
+    true
+  end
+
+  def expand(x, y)
+    # x, y = [node.x, node.y]
+    tiles = [
+      [x, (y - 1)], # north
+      [(x - 1), y], # west
+      [(x + 1), y], # east
+      [x, (y + 1)], # south
+    ]
+    # tiles.flat_map do |(px, py)|
+    #   case @types[[px, py]]
+    #   when ROCKY then [[px, py, CLIMB], [px, py, TORCH]]
+    #   when WET then [[px, py, CLIMB], [px, py, NEITHER]]
+    #   when NARROW then [[px, py, TORCH], [px, py, NEITHER]]
+    #   end
+    # end.compact
+  end
+end
+
 
 class Dijkstra
   def initialize(graph, source_node)
@@ -94,7 +154,7 @@ class Dijkstra
     @source_node = source_node
     @path_to = {}
     @distance_to = {}
-    @pq = PriorityQueue.new
+    @pq = PQueue.new { |a, b| @distance_to[a] < @distance_to[b] }
 
     compute_shortest_path
   end
@@ -105,8 +165,7 @@ class Dijkstra
       path.unshift(node)
       node = @path_to[node]
     end
-
-    path.unshift(@source_node)
+    path
   end
 
   private
@@ -115,17 +174,17 @@ class Dijkstra
     update_distance_of_all_edges_to(Float::INFINITY)
     @distance_to[@source_node] = 0
 
-    @pq.insert(@source_node, 0)
-    while @pq.any?
-      node = @pq.remove_min
-      node.adjacent_edges.each do |adj_edge|
+    @pq << @source_node
+    until @pq.empty?
+      node = @pq.pop
+      @graph.edges[node].each do |adj_edge|
         relax(adj_edge)
       end
     end
   end
 
   def update_distance_of_all_edges_to(distance)
-    @graph.nodes.each do |node|
+    @graph.nodes.each do |_, node|
       @distance_to[node] = distance
     end
   end
@@ -138,112 +197,27 @@ class Dijkstra
 
     # If the node is already in this priority queue, the only that happens is
     # that its distance is decreased.
-    @pq.insert(edge.to, @distance_to[edge.to])
+    # @pq.insert(edge.to, @distance_to[edge.to])
+    @pq << edge.to
   end
 end
 
-# class AStar
-#   def initialize(start, destination, types)
-#     @start_node = Node.new(*start, -1, 0, -1, -1, TORCH)
-#     @dest_node  = Node.new(*destination, -1, -1, -1, -1, TORCH)
-#     @open_nodes = [] # nodes to be inspected
-#     @closed_nodes = [] # node we've already inspected
-#     @open_nodes
-#     @types = types
-#   end
-#
-#   def distance(node, dest)
-#     (node.x - dest.x).abs + (node.y - dest.y).abs
-#   end
-#
-#   def minutes(from_tool, to_tool)
-#     return 1 if from_tool == to_tool
-#     8
-#   end
-#
-#   def passable?(x, y, tool)
-#     return false if x < 0 || y < 0
-#     return false if tool == NEITHER && @types[[x, y]] == ROCKY
-#     return false if tool == TORCH && @types[[x, y]] == WET
-#     return false if tool == CLIMB && @types[[x, y]] == NARROW
-#     true
-#   end
-#
-#   def expand(x, y)
-#     # x, y = [node.x, node.y]
-#     tiles = [
-#       [x, (y - 1)], # north
-#       [(x - 1), y], # west
-#       [(x + 1), y], # east
-#       [x, (y + 1)], # south
-#     ]
-#     tiles.flat_map do |(px, py)|
-#       case @types[[px, py]]
-#       when ROCKY then [[px, py, CLIMB], [px, py, TORCH]]
-#       when WET then [[px, py, CLIMB], [px, py, NEITHER]]
-#       when NARROW then [[px, py, TORCH], [px, py, NEITHER]]
-#       end
-#     end.compact
-#   end
-#
-#   # def bfs(pos, dest, seen = Set.new, path = [])
-#   #   x, y, tool, cost = pos
-#   #   seen << [x, y, tool]
-#   #   paths = []
-#   #   expand(x, y).each do |(nx, ny, new_tool)|
-#   #     next if seen.include?([nx, ny, new_tool])
-#   #     next unless passable?(nx, ny, new_tool) # && !(nx == @dest_node.x && ny == @dest_node.y)
-#   #     new_cost = cost + minutes(tool, new_tool)
-#   #     t_path = path + [[nx, ny, new_tool, new_cost]]
-#   #     paths << t_path
-#   #     paths += bfs([nx, ny, new_tool, new_cost], dest, seen, t_path)
-#   #   end
-#   #   paths
-#   # end
-#
-#   def search
-#     while @open_nodes.any?
-#       _f, best_node = @open_nodes.map.with_index.min_by { |node, _| node.f }
-#
-#       current_node = @open_nodes[best_node]
-#
-#       if current_node.x == @dest_node.x && current_node.y == @dest_node.y
-#         @dest_node.g = current_node.g + cost(current_node, @dest_node)
-#         path = [@dest_node]
-#
-#         while current_node.i != -1
-#           current_node = @closed_nodes[current_node.i]
-#           path.unshift(current_node)
-#         end
-#
-#         return path
-#       end
-#
-#       @open_nodes.delete_at(best_node)
-#       @closed_nodes << current_node
-#
-#       expand(current_node).each do |(nx, ny, new_tool)|
-#         next if !passable?(nx, ny, new_tool) && !(nx == @dest_node.x && ny == @dest_node.y)
-#         next if (@closed_nodes + @open_nodes).any? { |node| node.x == nx && node.y == ny }
-#
-#         new_node = Node.new(nx, ny, @closed_nodes.size - 1, -1, -1, -1, new_tool)
-#
-#         new_node.g = current_node.g + cost(current_node, new_node)
-#         new_node.h = distance(new_node, @dest_node)
-#         new_node.f = new_node.g + new_node.h
-#
-#         @open_nodes << new_node
-#       end
-#     end
-#     []
-#   end
-# end
-
 puts render(types, [0, 0], target).map(&:join)
 
-# pathfinder = AStar.new([0, 0], [10, 10], types)
-pathfinder = AStar.new(types)
-result = pathfinder.bfs([0, 0, TORCH, 0], [*target, TORCH])
+graph = Graph.new(types)
+graph.build!
 
-puts result.select { |path| path.last[0..1] == target }.sort_by { |path| path.last.last }.first.to_s
+from_node = graph.nodes[[0, 0, TORCH]]
+to_node = graph.nodes[[*target, TORCH]]
 
+shortest = Dijkstra.new(graph, from_node).shortest_path_to(to_node)
+puts shortest.inspect
+
+cost = 0
+tool = from_node.tool
+shortest.each do |node|
+  cost += node.tool == tool ? 1 : 8
+  tool = node.tool
+end
+
+puts cost
