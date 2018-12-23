@@ -5,11 +5,12 @@ require 'set'
 require 'rubygems'
 require 'pqueue'
 
+# example input. should output 45 for cost and 114 for risk
 # depth = 510
 # target = [10, 10]
 
-max_x = target[0] + 10
-max_y = target[1] + 10
+max_x = target[0] + 60
+max_y = target[1] + 4
 
 indexes = {}
 types = {}
@@ -34,14 +35,27 @@ total_risk = 0
   end
 end
 
-def render(tiles, pos, target)
+def render(tiles, pos, target, path = nil)
   board = []
+  if path
+    path_hash = {}
+    path.each do |node|
+      path_hash[node.y] ||= []
+      path_hash[node.y][node.x] = node
+    end
+  end
   tiles.each do |(x, y), risk|
     board[y] ||= []
     board[y][x] = if pos == [x, y]
                     'X'
                   elsif target == [x, y]
                     'M'
+                  elsif path && path_hash[y] && path_hash[y][x]
+                    case path_hash[y][x].tool
+                    when CLIMB then 'C'
+                    when TORCH then 'T'
+                    when NEITHER then 'N'
+                    end
                   else
                     %w[. = |][risk]
                   end
@@ -63,13 +77,8 @@ CLIMB = :climb
 TORCH = :torch
 NEITHER = :neither
 
-Edge = Struct.new(:from, :to, :weight) do
-  def <=>(other)
-    self.weight <=> other.weight
-  end
-end
-
 Node = Struct.new(:x, :y, :type, :tool)
+Edge = Struct.new(:from, :to, :weight)
 
 class Graph
   attr_accessor :nodes, :edges, :types
@@ -82,7 +91,6 @@ class Graph
 
   def build!
     @types.each do |(x, y), type|
-      # make nodes for each possible tool
       tools = case type
               when ROCKY then [CLIMB, TORCH]
               when WET then [CLIMB, NEITHER]
@@ -99,63 +107,49 @@ class Graph
         set.each do |node|
           next unless passable?(nx, ny)
           @nodes[[nx, ny]]&.each do |dest|
-            weight = minutes(node.tool, dest.tool)
-            add_edge(node, dest, weight)
+            add_edge(node, dest, minutes(node.tool, dest.tool))
           end
         end
       end
     end
 
     @nodes = @nodes.flat_map do |(x, y), set|
-      set.to_a.map do |node|
-        [[x, y, node.tool], node]
-      end
+      set.to_a.map { |node| [[x, y, node.tool], node] }
     end.to_h
   end
 
   def add_edge(from, to, weight)
-    # puts "adding edge from #{from} to #{to} with weight #{weight}"
-    edges[from] ||= Set.new
-    edges[from] << Edge.new(from, to, weight)
+    @edges[from] ||= Set.new
+    @edges[from] << Edge.new(from, to, weight)
   end
 
   def minutes(from_tool, to_tool)
-    return 1 if from_tool == to_tool
-    8
+    from_tool == to_tool ? 1 : 8
   end
 
   def passable?(x, y)
-    return false if x < 0 || y < 0
-    true
+    x >= 0 && y >= 0
   end
 
   def expand(x, y)
-    # x, y = [node.x, node.y]
-    tiles = [
+    [
       [x, (y - 1)], # north
       [(x - 1), y], # west
       [(x + 1), y], # east
       [x, (y + 1)], # south
     ]
-    # tiles.flat_map do |(px, py)|
-    #   case @types[[px, py]]
-    #   when ROCKY then [[px, py, CLIMB], [px, py, TORCH]]
-    #   when WET then [[px, py, CLIMB], [px, py, NEITHER]]
-    #   when NARROW then [[px, py, TORCH], [px, py, NEITHER]]
-    #   end
-    # end.compact
   end
 end
-
 
 class Dijkstra
   def initialize(graph, source_node)
     @graph = graph
     @source_node = source_node
     @path_to = {}
-    @distance_to = {}
+    @distance_to = Hash.new { Float::INFINITY }
     @pq = PQueue.new { |a, b| @distance_to[a] < @distance_to[b] }
-
+    @distance_to[@source_node] = 0
+    @pq << @source_node
     compute_shortest_path
   end
 
@@ -171,21 +165,9 @@ class Dijkstra
   private
 
   def compute_shortest_path
-    update_distance_of_all_edges_to(Float::INFINITY)
-    @distance_to[@source_node] = 0
-
-    @pq << @source_node
     until @pq.empty?
       node = @pq.pop
-      @graph.edges[node].each do |adj_edge|
-        relax(adj_edge)
-      end
-    end
-  end
-
-  def update_distance_of_all_edges_to(distance)
-    @graph.nodes.each do |_, node|
-      @distance_to[node] = distance
+      @graph.edges[node].each { |edge| relax(edge) }
     end
   end
 
@@ -195,14 +177,9 @@ class Dijkstra
     @distance_to[edge.to] = @distance_to[edge.from] + edge.weight
     @path_to[edge.to] = edge.from
 
-    # If the node is already in this priority queue, the only that happens is
-    # that its distance is decreased.
-    # @pq.insert(edge.to, @distance_to[edge.to])
     @pq << edge.to
   end
 end
-
-puts render(types, [0, 0], target).map(&:join)
 
 graph = Graph.new(types)
 graph.build!
@@ -211,7 +188,8 @@ from_node = graph.nodes[[0, 0, TORCH]]
 to_node = graph.nodes[[*target, TORCH]]
 
 shortest = Dijkstra.new(graph, from_node).shortest_path_to(to_node)
-puts shortest.inspect
+
+puts render(types, [0, 0], target, shortest).map(&:join)
 
 cost = 0
 tool = from_node.tool
@@ -221,3 +199,6 @@ shortest.each do |node|
 end
 
 puts cost
+
+# guessed 1009 and 1002, both too high
+# try 981
