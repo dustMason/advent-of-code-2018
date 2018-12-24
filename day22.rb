@@ -10,7 +10,7 @@ require 'pqueue'
 # target = [10, 10]
 
 max_x = target[0] + 60
-max_y = target[1] + 4
+max_y = target[1] + 5
 
 indexes = {}
 types = {}
@@ -77,6 +77,12 @@ CLIMB = :climb
 TORCH = :torch
 NEITHER = :neither
 
+ALLOWED = {
+  ROCKY => [CLIMB, TORCH].to_set,
+  WET => [CLIMB, NEITHER].to_set,
+  NARROW => [TORCH, NEITHER].to_set,
+}
+
 Node = Struct.new(:x, :y, :type, :tool)
 Edge = Struct.new(:from, :to, :weight)
 
@@ -91,12 +97,7 @@ class Graph
 
   def build!
     @types.each do |(x, y), type|
-      tools = case type
-              when ROCKY then [CLIMB, TORCH]
-              when WET then [CLIMB, NEITHER]
-              when NARROW then [TORCH, NEITHER]
-              end
-      tools.each do |tool|
+      ALLOWED[type].each do |tool|
         @nodes[[x, y]] ||= Set.new
         @nodes[[x, y]] << Node.new(x, y, type, tool)
       end
@@ -104,9 +105,10 @@ class Graph
 
     @nodes.each do |(x, y), set|
       expand(x, y).each do |(nx, ny)|
+        next unless passable?(nx, ny)
         set.each do |node|
-          next unless passable?(nx, ny)
           @nodes[[nx, ny]]&.each do |dest|
+            next unless ALLOWED[node.type].include?(dest.tool)
             add_edge(node, dest, minutes(node.tool, dest.tool))
           end
         end
@@ -199,6 +201,3 @@ shortest.each do |node|
 end
 
 puts cost
-
-# guessed 1009 and 1002, both too high
-# try 981
