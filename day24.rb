@@ -14,10 +14,11 @@ Group = Struct.new(
     :immunity,
     :weakness,
     :team,
-    :group_number
+    :group_number,
+    :boost
 ) do
   def effective_power
-    units * damage
+    units * (damage + boost)
   end
 
   def potential_damage(power, type)
@@ -30,7 +31,6 @@ Group = Struct.new(
   def take_hit(power, type)
     amount = potential_damage(power, type)
     units_killed = [amount / hp, units].min
-    # puts "#{team} group #{group_number} lost #{units_killed}"
     self.units -= units_killed
     self.units > 0
   end
@@ -40,7 +40,7 @@ Group = Struct.new(
   end
 end
 
-groups = input.split("\n\n").flat_map.with_index do |text, i|
+original_groups = input.split("\n\n").flat_map.with_index do |text, i|
   text.strip.lines[1..-1].map.with_index do |line, no|
     group = Group.new(*line.scan(/\d+/).map(&:to_i))
     group.damage_type = line.match(/(\w+) damage/)[1]
@@ -61,55 +61,65 @@ groups = input.split("\n\n").flat_map.with_index do |text, i|
   end
 end
 
-puts input
-puts groups
-puts "***"
+best_boost = (0..100_000).bsearch do |boost|
+  groups = original_groups.map do |group|
+    g = group.dup
+    g.boost = g.team == IMMUNE ? boost : 0
+    g
+  end
 
-loop do
-  # 1. target selection
+  its = 0
 
-  matchups = []
-  targets = groups.group_by(&:team)
-  ranked = groups.sort_by { |g| [g.effective_power, g.initiative] }
+  winner = loop do
+    # 1. target selection
 
-  until ranked.empty?
-    group = ranked.pop
-    # go through each other remaining group and pick the one we can do most damage to
-    next if targets[group.enemy_team].empty?
-    can_damage = false
+    matchups = []
+    targets = groups.group_by(&:team)
+    ranked = groups.sort_by { |g| [g.effective_power, g.initiative] }
 
-    target = targets[group.enemy_team].max_by do |t|
-      damage = t.potential_damage(group.damage, group.damage_type)
-      can_damage = can_damage || damage > 0
-      [damage, t.effective_power, t.initiative]
+    until ranked.empty?
+      group = ranked.pop
+      next if targets[group.enemy_team].empty?
+      can_damage = false
+
+      target = targets[group.enemy_team].max_by do |t|
+        damage = t.potential_damage(group.damage, group.damage_type)
+        can_damage = can_damage || damage > 0
+        [damage, t.effective_power, t.initiative]
+      end
+      next unless can_damage
+      matchups << [group, target]
+      targets[group.enemy_team] -= [target]
     end
-    next unless can_damage
-    # puts "#{group.team} group #{group.group_number} will target #{target.team} #{target.group_number}"
-    matchups << [group, target]
-    targets[group.enemy_team] -= [target]
+
+    # 2. attacking
+
+    attackers = matchups.sort_by { |attacker, _defender| attacker.initiative }
+    until attackers.empty?
+      attacker, defender = attackers.pop
+      alive = defender.take_hit(attacker.effective_power, attacker.damage_type)
+      groups -= [defender] unless alive
+    end
+
+    break groups.first.team if groups.map(&:team).uniq.size < 2
+    its += 1
+
+    # some situations go way too long, so we can guess the winner by who has most
+    # units left after 50k iterations.
+    if its > 50_000
+      break groups
+                .group_by { |g| g.team }
+                .max_by { |_team, groups| groups.reduce(0) { |acc, g| acc + g.units } }
+                .first
+    end
   end
-  # puts '.'
 
-  # 2. attacking
+  puts "boost #{boost}: #{groups.reduce(0) { |acc, g| acc + g.units }} #{winner} units remaining after #{its} iterations"
 
-  attackers = matchups.sort_by { |attacker, _defender| attacker.initiative }
-  until attackers.empty?
-    attacker, defender = attackers.pop
-    alive = defender.take_hit(attacker.effective_power, attacker.damage_type)
-    groups -= [defender] if !alive
-  end
-  # puts "."
-
-  # puts groups
-  # puts "--- "*5
-  break if groups.map(&:team).uniq.size < 2
-  print "."
+  winner == IMMUNE
 end
 
-puts
-puts groups.reduce(0) { |acc, g| acc + g.units }
-
-# guessed 10709, too low!
+puts "the best boost is #{best_boost}"
 
 __END__
 Immune System:
