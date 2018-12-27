@@ -4,23 +4,19 @@ require 'union_find'
 
 input = DATA.read
 
-Point = Struct.new(:x, :y, :z, :t) do
-  def close?(point)
-    (point.x - x).abs + (point.y - y).abs + (point.z - z).abs + (point.t - t).abs <= 3
-  end
-end
+Point = Struct.new(:x, :y, :z, :t)
 
 points = input.lines.map do |line|
   Point.new(*line.scan(/-?\d+/).flatten.map(&:to_i))
 end
 
-constellations = UnionFind::UnionFind.new(points.to_set)
+groups = UnionFind::UnionFind.new(points.to_set)
 
 points.permutation(2).each do |p1, p2|
-  constellations.union(p1, p2) if p1.close?(p2)
+  groups.union(p1, p2) if %i[x y z t].reduce(0) { |sum, m| sum + (p1[m] - p2[m]).abs } <= 3
 end
 
-puts constellations.count_isolated_components
+puts groups.count_isolated_components
 
 __END__
 -6,-5,7,7
